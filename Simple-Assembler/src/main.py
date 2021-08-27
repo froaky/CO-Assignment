@@ -1,65 +1,58 @@
 from sys import stdin
+import command
 import syntax
-import assembly
+import output
 
 def main():
     line_count = 0
-    instruction_count = 0
+    var_count = 0
+    i_flag = 0
     labels = {}
     variables = {}
-    var_count = 0
-    temp = []
+    assembly = []
     program = []
 
     for line in stdin:
         if line == '':
-            break    
-        temp.append(line.split())
+            break
+        assembly.append(tuple((line.split())))
 
-    for t in temp:
+    for line in assembly:
         line_count += 1
-        if len(t) == 1 and t[0] != "hlt":
-            print("Line", line_count, "-> Syntax Error: Typo in instruction name")
-            return
-        else:
-            instruction = [line_count, instruction_count]
+        
+        check = syntax.check(i_flag, line, variables, labels)
 
-            if t[0] == "var":
-                if len(t) == 2:
-                    if syntax.isName(t[1]):
-                        if instruction_count == 0:
-                            variables[t[1]] = var_count
-                            var_count += 1
-                        else:
-                            print("Line", line_count, "-> Syntax Error: Variable not declared at the beginning")
-                            return
-                    else:
-                        print("Line", line_count, "-> Syntax Error: Variable name invalid")
-                        return
-                else:
-                    print("Line", line_count, "-> General Syntax Error")
-                    return
-            
-            elif syntax.isLabel(t[0]):
-                labels[t[0][0:-1]] = syntax.mem_addr(instruction_count)
-                instruction.extend(t)
-                program.append(instruction)
-                instruction_count += 1
-
+        if check == "label: instruction":
+            i_flag += 1
+            if len(line[1:]) <= 4: 
+                program.append(command.Command(line_count, *line[1:]))
+                labels[line[0][0:-1]] = command.mem_addr(len(program) - 1)
             else:
-                instruction.extend(t)
-                program.append(instruction)
-                instruction_count += 1
+                print("Line", line_count, "-> General Syntax Error: Too many arguments")
+        
+        elif check == "instruction":
+            i_flag += 1
+            if len(line) <= 4:
+                program.append(command.Command(line_count, *line))
+            else:
+                print("Line", line_count, "-> General Syntax Error: Too many arguments")
+
+        elif check == "variable":
+            variables[line[1]] = var_count
+            var_count += 1
+
+        elif check == "empty line":
+            continue
+
+        else:
+            print("Line", line_count, "-> Error:", check)
+            return
 
     for variable in variables:
-        variables[variable] += instruction_count
-        variables[variable] = syntax.mem_addr(variables[variable])
-    
-    for instruction in program:
-        if syntax.isInstruction(instruction, labels, variables, line_count) == False:
-            return
-    
-    assembly.translateToBinary(program, line_count)
-                
+        variables[variable] += len(program)
+        variables[variable] = command.mem_addr(variables[variable])
+
+    output.translateToBinary(program, line_count, variables, labels)
+
 if __name__ == "__main__":
     main()
